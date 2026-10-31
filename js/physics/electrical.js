@@ -1,40 +1,55 @@
 /**
- * Calcula la carga eléctrica, consumo real y corriente necesaria basada en la potencia RMS total.
- * @param {number} totalRmsPower - Potencia RMS combinada de bocinas y subwoofers (Watts)
- * @param {number} voltage - Voltaje de la red eléctrica (por defecto 120V)
- * @param {number} efficiency - Eficiencia del amplificador (ej. 0.85 para 85% Clase D)
- * @returns {Object} Resultados del cálculo eléctrico y alertas de seguridad
+ * Módulo de Cálculos Eléctricos, Termodinámica y Ley de Ohm
  */
-export function calculateElectricalLoad(totalRmsPower, voltage = 120, efficiency = 0.85) {
-    // Evitar división por cero o valores negativos
-    if (!totalRmsPower || totalRmsPower <= 0) {
-        return {
-            realPower: 0,
-            currentAmps: 0,
-            requiresDedicatedCircuit: false,
-            warning: null
-        };
+
+export function calculateElectricalLoad(speakers = [], subwoofers = [], voltage = 120, efficiency = 0.85) {
+    let totalRmsPower = 0;
+
+    // 1. Sumar la potencia RMS de todas las bocinas activas
+    if (Array.isArray(speakers)) {
+        speakers.forEach(s => {
+            if (s.active !== false) {
+                totalRmsPower += parseFloat(s.rmsWatts || 500);
+            }
+        });
     }
 
-    // 1. Potencia real tomada de la red eléctrica (considerando pérdidas térmicas del amplificador)
-    const realPower = totalRmsPower / efficiency;
+    // 2. Sumar la potencia RMS de todos los subwoofers activos
+    if (Array.isArray(subwoofers)) {
+        subwoofers.forEach(sub => {
+            if (sub.active !== false) {
+                totalRmsPower += parseFloat(sub.rmsWatts || 1000);
+            }
+        });
+    }
 
-    // 2. Cálculo de corriente usando la Ley de Ohm / Potencia: I = P / (V * Eficiencia)
-    const currentAmps = realPower / voltage;
+    // Valores seguros para evitar divisiones por cero o nulos
+    const safeVoltage = voltage > 0 ? voltage : 120;
+    const safeEfficiency = efficiency > 0 ? efficiency : 0.85;
 
-    // 3. Validación de seguridad para la infraestructura eléctrica (Umbral estándar de 15A)
-    let requiresDedicatedCircuit = false;
-    let warning = null;
+    // 3. Conservación de la energía: Potencia real tomada de la red considerando eficiencia del amplificador
+    const realPower = totalRmsPower / safeEfficiency;
 
+    // 4. Aplicación de la Ley de Ohm / Potencia: I = P_real / Voltaje
+    const currentAmps = realPower / safeVoltage;
+
+    // 5. Cálculos de infraestructura y protecciones (Breakers y Calibre de cable)
+    const breakersNeeded = Math.max(1, Math.ceil(currentAmps / 16));
+    
+    let wireGauge = '12 AWG (Residencial estándar)';
     if (currentAmps >= 15) {
-        requiresDedicatedCircuit = true;
-        warning = `Atención: El sistema demanda ${currentAmps.toFixed(1)} A, superando el límite seguro de un circuito residencial estándar (15A). Se requiere un circuito eléctrico dedicado o alimentación trifásica.`;
+        wireGauge = '10 AWG (Circuito Dedicado Requerido)';
+    }
+    if (currentAmps >= 30) {
+        wireGauge = '8 AWG o Alimentación Trifásica';
     }
 
     return {
-        realPower: parseFloat(realPower.toFixed(2)),       // Watts consumidos de la red
-        currentAmps: parseFloat(currentAmps.toFixed(2)),   // Amperios reales
-        requiresDedicatedCircuit,
-        warning
+        totalRmsPower: parseFloat(totalRmsPower.toFixed(2)),
+        realPower: parseFloat(realPower.toFixed(2)),
+        continuousAmps: parseFloat(currentAmps.toFixed(1)), // Retorna un número limpio en Amperios (evita el undefined)
+        breakersNeeded,
+        wireGauge,
+        requiresDedicatedCircuit: currentAmps >= 15
     };
 }

@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     notifyStateChange();
   });
 
-document.getElementById('venue-type').addEventListener('change', (e) => {
+  document.getElementById('venue-type').addEventListener('change', (e) => {
     const selectedType = e.target.value;
     AppState.venue.type = selectedType;
     const materialSelect = document.getElementById('venue-material');
@@ -205,7 +205,7 @@ document.getElementById('venue-type').addEventListener('change', (e) => {
   function updateDashboard(state) {
     syncSpeakerInputs();
 
-    // --- AGREGAR ESTE BLOQUE PARA SINCRONIZAR EL BLOQUEO DE MATERIAL ---
+    // Sincronizar bloqueo de material si es exterior
     const materialSelect = document.getElementById('venue-material');
     if (materialSelect) {
       materialSelect.disabled = state.venue.isMaterialLocked;
@@ -213,10 +213,6 @@ document.getElementById('venue-type').addEventListener('change', (e) => {
         materialSelect.value = 'open_air';
       }
     }
-    // -----------------------------------------------------------------
-
-    const rtResult = calculateRT60(state.venue);
-    // ... resto de tu código actual de updateDashboard
 
     const rtResult = calculateRT60(state.venue);
     document.getElementById('metric-rt60').textContent = `${rtResult.rt60} s`;

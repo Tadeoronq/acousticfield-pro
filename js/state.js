@@ -14,7 +14,8 @@ export const AppState = {
     height: 5,
     material: 'concrete',
     audienceCount: 200,
-    voltage: 120
+    voltage: 120,
+    isMaterialLocked: false // Bloqueo de material en exterior
   },
 
   stage: {

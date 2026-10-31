@@ -124,8 +124,24 @@ document.addEventListener('DOMContentLoaded', () => {
     notifyStateChange();
   });
 
-  document.getElementById('venue-type').addEventListener('change', (e) => {
-    AppState.venue.type = e.target.value;
+document.getElementById('venue-type').addEventListener('change', (e) => {
+    const selectedType = e.target.value;
+    AppState.venue.type = selectedType;
+    const materialSelect = document.getElementById('venue-material');
+
+    if (selectedType === 'outdoor') {
+      AppState.venue.material = 'open_air';
+      AppState.venue.isMaterialLocked = true;
+      if (materialSelect) {
+        materialSelect.value = 'open_air';
+        materialSelect.disabled = true;
+      }
+    } else {
+      AppState.venue.isMaterialLocked = false;
+      if (materialSelect) {
+        materialSelect.disabled = false;
+      }
+    }
     notifyStateChange();
   });
 
@@ -188,6 +204,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // ACTUALIZACIÓN GENERAL
   function updateDashboard(state) {
     syncSpeakerInputs();
+
+    // --- AGREGAR ESTE BLOQUE PARA SINCRONIZAR EL BLOQUEO DE MATERIAL ---
+    const materialSelect = document.getElementById('venue-material');
+    if (materialSelect) {
+      materialSelect.disabled = state.venue.isMaterialLocked;
+      if (state.venue.isMaterialLocked) {
+        materialSelect.value = 'open_air';
+      }
+    }
+    // -----------------------------------------------------------------
+
+    const rtResult = calculateRT60(state.venue);
+    // ... resto de tu código actual de updateDashboard
 
     const rtResult = calculateRT60(state.venue);
     document.getElementById('metric-rt60').textContent = `${rtResult.rt60} s`;

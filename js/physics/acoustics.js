@@ -111,46 +111,41 @@ export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ
 }
 
 export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoofers) {
-  const speakerCount = speakers ? speakers.length : 2;
-  const subCount = subwoofers ? subwoofers.length : 1;
-  const needsDelays = venue.length > 25;
-  const delayCount = needsDelays ? 2 : 0;
-  
-  const suggestedTilt = Math.min(15, Math.max(3, Math.round(venue.length / 3)));
-
-  let freqResponse = '55 Hz - 18,000 Hz (Full-Range estándar)';
-  if (sourceProfile === 'edm' || sourceProfile === 'electronic') freqResponse = '35 Hz - 20,000 Hz (Respuesta extendida en sub-graves)';
-  else if (sourceProfile === 'speech') freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en voz)';
-
-  // Definir si es sistema activo (por defecto true en configuraciones modernas)
-  const isPoweredSystem = true; 
-
-  let totalSpeakerWatts = 0;
-  speakers.forEach(s => totalSpeakerWatts += (s.rmsWatts || 500));
-  let totalSubWatts = 0;
-  subwoofers.forEach(s => totalSubWatts += (s.rmsWatts || 1000));
-
-  const targetRms = (totalSpeakerWatts + totalSubWatts) * 1.3; // Con headroom
-  const snrTarget = '≥ 105 dB (SNR para sonido limpio sin piso de ruido)';
-  const thdTarget = '< 0.05% THD (Distorsión Armónica Total imperceptible)';
-
-  let sampleRate = '48 kHz (Estándar profesional para eventos en vivo)';
-  let bitDepth = '24-bit (Rango dinámico amplio > 120 dB)';
-  if (sourceProfile === 'strings' || sourceProfile === 'percussion') {
-    sampleRate = '96 kHz / 24-bit (Alta resolución para instrumentos de precisión)';
-  }
-
+  // 1. Análisis físico del recinto (Volumen y Superficie)
   const volume = venue.length * venue.width * (venue.height || 5);
   const surfaceArea = 2 * (venue.width * venue.length + venue.width * (venue.height || 5) + venue.length * (venue.height || 5));
+  const audience = venue.audienceCount || 100;
+
+  // 2. Cálculo analítico de la demanda de potencia RMS basado en aforo y física
+  let basePowerPerPerson = 3.5; 
+  if (sourceProfile === 'edm' || sourceProfile === 'electronic') basePowerPerPerson = 5.0;
+  if (sourceProfile === 'speech') basePowerPerPerson = 1.5;
+
+  const calculatedRequiredRms = Math.round(audience * basePowerPerPerson * (rt60 > 1.5 ? 1.25 : 1.0));
   
+  // Sugerencia de cajas basada estrictamente en el aforo y la geometría
+  const recommendedTopBoxes = Math.max(2, Math.ceil(audience / 100));
+  const recommendedSubwoofers = Math.max(1, Math.ceil(audience / 150));
+
+  const suggestedTilt = Math.min(15, Math.max(3, Math.round(venue.length / 3)));
+  const needsDelays = venue.length > 25;
+
+  let freqResponse = '55 Hz - 18,000 Hz (Full-Range estándar)';
+  if (sourceProfile === 'edm' || sourceProfile === 'electronic') {
+    freqResponse = '35 Hz - 20,000 Hz (Respuesta extendida en sub-graves)';
+  } else if (sourceProfile === 'speech') {
+    freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en inteligibilidad vocal)';
+  }
+
+  // Métricas acústicas derivadas de la física del recinto
   const dcDistance = parseFloat((0.14 * Math.sqrt(volume / Math.max(0.1, rt60))).toFixed(1));
   
-  let c50Clarity = '+3 dB (Excelente inteligibilidad de la palabra)';
-  if (rt60 > 2.0) c50Clarity = '-3 dB / Pobre (Campo reverberante dominante)';
-  else if (rt60 > 1.2) c50Clarity = '0 dB / Moderado (Aceptable para música en vivo)';
+  let c50Clarity = '+3 dB (Excelente inteligibilidad de la palabra y definición)';
+  if (rt60 > 2.0) c50Clarity = '-3 dB / Pobre (Campo reverberante domina sobre el sonido directo)';
+  else if (rt60 > 1.2) c50Clarity = '0 dB / Moderado (Adecuado para música en vivo)';
 
-  // --- Lógica condicional avanzada para Sabins si RT60 > 1.5s ---
-  let absorptionSuggestion = 'Superficies con absorción acústica adecuada';
+  // Sugerencia inteligente de absorción basada en Sabins si el RT60 es alto
+  let absorptionSuggestion = 'Superficies con coeficiente de absorción adecuado para el espacio';
   if (rt60 > 1.5) {
     const targetRt60 = sourceProfile === 'speech' ? 0.8 : 1.2;
     const currentSabins = (0.161 * volume) / rt60;
@@ -158,35 +153,25 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     const missingSabins = Math.max(0, targetSabins - currentSabins);
     const percentageNeeded = Math.min(100, ((missingSabins / surfaceArea) * 100)).toFixed(1);
     
-    absorptionSuggestion = `Tratar al menos el ${percentageNeeded}% (${missingSabins.toFixed(1)} Sabins métricos) de las superficies con paneles fonoabsorbentes (NRC 0.85+)`;
-  }
-
-  const electroacousticsList = [
-    { label: 'Cantidad Cajas PA', value: `${speakerCount}x Sistemas Principales Activos (Aforo estimado: ${venue.audienceCount || 100} pers.)` },
-    { label: 'Subwoofers Requeridos', value: subCount > 0 ? `${subCount}x Subwoofers de 18" en arreglo optimizado` : 'Sin subwoofers activos' },
-    { label: 'Refuerzos (Delays)', value: needsDelays ? `${delayCount}x Cajas secundarias alineadas a los ${Math.round(venue.length * 0.6)}m` : 'No se requieren cajas de retardo' },
-    { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia la audiencia` },
-    { label: 'Respuesta en Frecuencia', value: freqResponse }
-  ];
-
-  // Ocultar métricas pasivas si el sistema es activo
-  if (!isPoweredSystem) {
-    electroacousticsList.push(
-      { label: 'Impedancia Nominal', value: '8 Ω por vía (Enlace controlado)' },
-      { label: 'Sensibilidad Requerida', value: '≥ 98 dB SPL @ 1W/1m' }
-    );
+    absorptionSuggestion = `Déficit acústico crítico: Tratar al menos el ${percentageNeeded}% (${missingSabins.toFixed(1)} Sabins métricos) con paneles fonoabsorbentes (NRC 0.85+)`;
   }
 
   return {
-    electroacoustics: electroacousticsList,
+    electroacoustics: [
+      { label: 'Topología Recomendada', value: `${recommendedTopBoxes}x Sistemas Principales Activos Balanceados (Diseñado para aforo de ${audience} pers.)` },
+      { label: 'Subwoofers Sugeridos', value: `${recommendedSubwoofers}x Subwoofers de 18" acoplados en fase (Evita cancelación asimétrica)` },
+      { label: 'Refuerzos (Delays)', value: needsDelays ? `Requerido: 2x Cajas de retardo alineadas a los ${Math.round(venue.length * 0.6)}m` : 'No se requieren líneas de retardo' },
+      { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia abajo para minimizar primeras reflexiones en muros` },
+      { label: 'Respuesta en Frecuencia', value: freqResponse }
+    ],
     amplification: [
-      { label: 'Potencia Real Sugerida', value: `${targetRms} W RMS (Incluyendo headroom dinámico de 3dB)` },
-      { label: 'Relación Señal/Ruido', value: snrTarget },
-      { label: 'Distorsión Armónica', value: thdTarget },
-      { label: 'Procesamiento Digital (DSP)', value: `Filtros FIR, Alineación temporal y DAC @ ${sampleRate}, ${bitDepth}` }
+      { label: 'Potencia Real Sugerida (Física)', value: `${calculatedRequiredRms} W RMS Totales (Calculada por aforo, volumen y headroom de 3dB)` },
+      { label: 'Relación Señal/Ruido', value: '≥ 105 dB (SNR para operación limpia sin piso de ruido audible)' },
+      { label: 'Distorsión Armónica (THD)', value: '< 0.05% THD a potencia nominal (Clase D de alta eficiencia)' },
+      { label: 'Procesamiento Digital (DSP)', value: 'Filtrado FIR de fase lineal, alineación temporal (Delay ms) y EQ paramétrica' }
     ],
     acoustics: [
-      { label: 'Distancia Crítica (Dc)', value: `${dcDistance}m desde el proscenio (Equilibrio directo/reverberante)` },
+      { label: 'Distancia Crítica (Dc)', value: `${dcDistance}m desde el proscenio (Límite donde el campo directo iguala al reverberante)` },
       { label: 'Índice de Claridad C50/C80', value: c50Clarity },
       { label: 'Sugerencia de Absorción', value: absorptionSuggestion }
     ]

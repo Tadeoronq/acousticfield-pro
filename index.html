@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AcousticField Pro - Simulación y Análisis Acústico</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+  <!-- BARRA SUPERIOR / ACCIONES RÁPIDAS -->
+  <header class="app-header">
+    <div class="brand">
+      <h1>AcousticField <span>PRO</span></h1>
+      <span class="badge-status">Listo</span>
+    </div>
+    <div class="header-actions">
+      <button id="btn-preset-bar" class="btn btn-secondary">Preset: Bar/Antro</button>
+      <button id="btn-preset-boda" class="btn btn-secondary">Preset: Boda</button>
+      <button id="btn-export-pdf" class="btn btn-primary">Exportar PDF</button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL DUAL (CONTROLES + VISOR) -->
+  <main class="app-container">
+    
+    <!-- PANEL LATERAL DE CONTROLES -->
+    <aside class="sidebar-controls">
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-venue">1. Recinto</button>
+        <button class="tab-btn" data-tab="tab-speakers">2. Equipo</button>
+        <button class="tab-btn" data-tab="tab-source">3. Fuente/Uso</button>
+      </nav>
+
+      <div class="tabs-content">
+        <!-- TAB 1: RECINTO Y ENTORNO -->
+        <section id="tab-venue" class="tab-pane active">
+          <h3>Dimensiones del Recinto</h3>
+          <div class="form-group">
+            <label for="venue-type">Entorno</label>
+            <select id="venue-type">
+              <option value="indoor" selected>Interior (Con muros)</option>
+              <option value="outdoor">Exterior (Cielo abierto)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="venue-shape">Geometría de la Sala</label>
+            <select id="venue-shape">
+              <option value="rectangle" selected>Rectangular</option>
+              <option value="circle">Circular / Palenque</option>
+              <option value="fan">En Abanico (Teatro/Auditorio)</option>
+              <option value="irregular">Polígono Irregular</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="venue-length">Largo (m)</label>
+              <input type="number" id="venue-length" value="20" min="5" max="100">
+            </div>
+            <div class="form-group">
+              <label for="venue-width">Ancho (m)</label>
+              <input type="number" id="venue-width" value="15" min="5" max="100">
+            </div>
+            <div class="form-group">
+              <label for="venue-height">Alto (m)</label>
+              <input type="number" id="venue-height" value="5" min="2" max="30">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="venue-material">Material Predominante</label>
+            <select id="venue-material">
+              <option value="concrete" selected>Concreto / Vidrio (Muy reflexivo)</option>
+              <option value="drywall">Tablaroca / Madera</option>
+              <option value="brick">Ladrillo Visto / Mampostería</option>
+              <option value="tile">Mármol / Azulejo / Cerámica</option>
+              <option value="carpet">Alfombra / Mobiliario Afelpado</option>
+              <option value="panels">Paneles Acústicos (Absorbente)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="venue-audience">Aforo Estimado (Personas)</label>
+            <input type="number" id="venue-audience" value="200" min="0" max="5000">
+          </div>
+        </section>
+
+        <!-- TAB 2: ESCENARIO Y EQUIPO -->
+        <section id="tab-speakers" class="tab-pane">
+          <h3>Tarima / Escenario</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="stage-w">Ancho Tarima (m)</label>
+              <input type="number" id="stage-w" value="6" min="1">
+            </div>
+            <div class="form-group">
+              <label for="stage-l">Profundidad (m)</label>
+              <input type="number" id="stage-l" value="3" min="1">
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <h3>Cajas Principales (PA)</h3>
+          <div class="form-row" style="margin-bottom: 0.8rem;">
+            <button id="btn-add-speaker" class="btn btn-secondary" style="flex:1;">＋ Agregar Bocina</button>
+            <button id="btn-remove-speaker" class="btn btn-secondary" style="flex:1;">－ Quitar</button>
+          </div>
+
+          <div class="form-group">
+            <label for="speaker-select">Seleccionar Bocina para Editar</label>
+            <select id="speaker-select">
+              <!-- Opciones agregadas dinámicamente -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="speaker-spl">Sensibilidad / SPL Pico @ 1m (dB)</label>
+            <input type="number" id="speaker-spl" value="128" min="90" max="150">
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="speaker-angle">Ángulo Apuntamiento (°)</label>
+              <input type="number" id="speaker-angle" value="0" min="-180" max="180">
+            </div>
+            <div class="form-group">
+              <label for="speaker-tilt">Inclinación Down-tilt (°)</label>
+              <input type="number" id="speaker-tilt" value="5" min="0" max="45">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="speaker-rms">Potencia RMS de esta caja (Watts)</label>
+            <input type="number" id="speaker-rms" value="500" min="50" max="5000">
+          </div>
+
+          <hr class="divider">
+
+          <h3>Subwoofers</h3>
+          <div class="form-row" style="margin-bottom: 0.8rem;">
+            <button id="btn-add-sub" class="btn btn-secondary" style="flex:1;">＋ Agregar Sub</button>
+            <button id="btn-remove-sub" class="btn btn-secondary" style="flex:1;">－ Quitar</button>
+          </div>
+
+          <div class="form-group">
+            <label for="sub-spl">SPL Subwoofer Pico @ 1m (dB)</label>
+            <input type="number" id="sub-spl" value="133" min="100" max="150">
+          </div>
+          <div class="form-group">
+            <label for="sub-rms">Potencia RMS Subwoofer (Watts)</label>
+            <input type="number" id="sub-rms" value="1000" min="100" max="10000">
+          </div>
+        </section>
+
+        <!-- TAB 3: FUENTE SONORA Y RED ELÉCTRICA -->
+        <section id="tab-source" class="tab-pane">
+          <h3>Perfil del Evento</h3>
+          <div class="form-group">
+            <label for="source-profile">Tipo de Contenido Audio / Instrumentación</label>
+            <select id="source-profile">
+              <option value="speech">Conferencia / Voz Hablada</option>
+              <option value="strings">Instrumentos de Cuerda (Violín, Guitarra)</option>
+              <option value="percussion">Percusiones / Batería / Tambores</option>
+              <option value="live_band" selected>Banda / Grupo en Vivo (Espectro Completo)</option>
+              <option value="edm">DJ / Música Electrónica (Sub-graves Intensos)</option>
+            </select>
+          </div>
+
+          <hr class="divider">
+
+          <h3>Suministro Eléctrico Disponible</h3>
+          <div class="form-group">
+            <label for="voltage-select">Voltaje de Red</label>
+            <select id="voltage-select">
+              <option value="120" selected>120V Standard</option>
+              <option value="220">220V Bifásico / Trifásico</option>
+            </select>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <!-- ÁREA CENTRAL DE VISUALIZACIÓN & DIAGNÓSTICO -->
+    <section class="viewport-area">
+      <!-- MODO DE VISTA Y CONTROLES DEL LIENZO -->
+      <div class="canvas-toolbar">
+        <div class="toggle-group">
+          <button id="btn-mode-waves" class="btn btn-toggle active">Animación Ondas</button>
+          <button id="btn-mode-heatmap" class="btn btn-toggle">Mapa de Calor SPL</button>
+        </div>
+        <div class="audio-sim-control">
+          <button id="btn-toggle-audio" class="btn btn-audio">🔊 Escuchar Simulación DSP</button>
+        </div>
+      </div>
+
+      <!-- LIENZO INTERACTIVO (CANVAS 2D) -->
+      <div class="canvas-wrapper">
+        <canvas id="acoustic-canvas" width="800" height="600"></canvas>
+      </div>
+
+      <!-- LEYENDA TÉRMICA -->
+      <div class="heatmap-legend">
+        <span>&lt; 75 dB (Sordo)</span>
+        <div class="legend-bar"></div>
+        <span>&gt; 105 dB (Saturación)</span>
+      </div>
+
+      <!-- PANEL DE DIAGNÓSTICO Y MÉTRICAS -->
+      <div class="metrics-panel">
+        <div class="metric-card">
+          <h4>Reverberación RT60</h4>
+          <span id="metric-rt60" class="metric-value">-- s</span>
+          <span id="metric-rt60-status" class="metric-sub">Calculando...</span>
+        </div>
+        <div class="metric-card">
+          <h4>SPL Posición Oyente</h4>
+          <span id="metric-spl-listener" class="metric-value">-- dB</span>
+          <span id="metric-listener-status" class="metric-sub">Mueve el oyente en el plano</span>
+        </div>
+        <div class="metric-card">
+          <h4>Demanda Eléctrica</h4>
+          <span id="metric-current" class="metric-value">-- A</span>
+          <span id="metric-breakers" class="metric-sub">-- Breakers 20A</span>
+        </div>
+      </div>
+
+      <!-- PANEL DE CARACTERÍSTICAS TÉCNICAS RECOMENDADAS -->
+      <div class="recommendations-panel">
+        <h3>📋 Especificaciones Técnicas Recomendadas del Sistema</h3>
+        <div id="recommendations-container" class="recommendations-grid">
+          <!-- Las tarjetas de especificaciones se renderizan dinámicamente -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

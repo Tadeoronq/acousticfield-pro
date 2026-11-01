@@ -232,7 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const elecResult = calculateElectricalLoad(
       state.speakers,
       state.subwoofers,
-      state.venue.voltage
+      state.venue.voltage,
+      0.85,
+      state.venue,
+      state.sourceProfile,
+      rtResult.rt60
     );
     document.getElementById('metric-current').textContent = `${elecResult.continuousAmps} A`;
     document.getElementById('metric-breakers').textContent = `${elecResult.breakersNeeded} Breaker(s) 20A (${elecResult.wireGauge})`;

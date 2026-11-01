@@ -48,7 +48,6 @@ export function calculateOffAxisLoss(speaker, listenerX, listenerY, listenerZ) {
   const dx = listenerX - speaker.x;
   const dy = listenerY - speaker.y;
   
-  // Ángulo relativo respecto a la rotación propia de esta bocina
   const angleRad = Math.atan2(dx, dy);
   const angleDeg = (angleRad * (180 / Math.PI));
   
@@ -70,7 +69,6 @@ export function calculateOffAxisLoss(speaker, listenerX, listenerY, listenerZ) {
 export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ = 1.2, venueType = 'indoor', subwoofers = []) {
   let totalIntensity = 0;
 
-  // 1. Aporte de Cajas Principales PA
   speakers.forEach(speaker => {
     if (!speaker.active) return;
 
@@ -87,7 +85,6 @@ export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ
     totalIntensity += Math.pow(10, splFromSpeaker / 10);
   });
 
-  // 2. Aporte de Subwoofers (Omnidireccionales en baja frecuencia)
   if (subwoofers && Array.isArray(subwoofers)) {
     subwoofers.forEach(sub => {
       if (!sub.active) return;
@@ -111,22 +108,20 @@ export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ
 }
 
 export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoofers) {
-  // 1. Análisis físico del recinto (Volumen y Superficie)
   const volume = venue.length * venue.width * (venue.height || 5);
   const surfaceArea = 2 * (venue.width * venue.length + venue.width * (venue.height || 5) + venue.length * (venue.height || 5));
   const audience = venue.audienceCount || 100;
 
-  // 2. Cálculo analítico de la demanda de potencia RMS basado en aforo y física
+  // Contar subwoofers y bocinas activas reales definidas por el usuario en la interfaz
+  const activeSubCount = subwoofers ? subwoofers.filter(s => s.active !== false).length : 0;
+  const activeSpeakerCount = speakers ? speakers.filter(s => s.active !== false).length : 2;
+
   let basePowerPerPerson = 3.5; 
   if (sourceProfile === 'edm' || sourceProfile === 'electronic') basePowerPerPerson = 5.0;
   if (sourceProfile === 'speech') basePowerPerPerson = 1.5;
 
   const calculatedRequiredRms = Math.round(audience * basePowerPerPerson * (rt60 > 1.5 ? 1.25 : 1.0));
   
-  // Sugerencia de cajas basada estrictamente en el aforo y la geometría
-  const recommendedTopBoxes = Math.max(2, Math.ceil(audience / 100));
-  const recommendedSubwoofers = Math.max(1, Math.ceil(audience / 150));
-
   const suggestedTilt = Math.min(15, Math.max(3, Math.round(venue.length / 3)));
   const needsDelays = venue.length > 25;
 
@@ -137,14 +132,12 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en inteligibilidad vocal)';
   }
 
-  // Métricas acústicas derivadas de la física del recinto
   const dcDistance = parseFloat((0.14 * Math.sqrt(volume / Math.max(0.1, rt60))).toFixed(1));
   
   let c50Clarity = '+3 dB (Excelente inteligibilidad de la palabra y definición)';
   if (rt60 > 2.0) c50Clarity = '-3 dB / Pobre (Campo reverberante domina sobre el sonido directo)';
   else if (rt60 > 1.2) c50Clarity = '0 dB / Moderado (Adecuado para música en vivo)';
 
-  // Sugerencia inteligente de absorción basada en Sabins si el RT60 es alto
   let absorptionSuggestion = 'Superficies con coeficiente de absorción adecuado para el espacio';
   if (rt60 > 1.5) {
     const targetRt60 = sourceProfile === 'speech' ? 0.8 : 1.2;
@@ -156,14 +149,27 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     absorptionSuggestion = `Déficit acústico crítico: Tratar al menos el ${percentageNeeded}% (${missingSabins.toFixed(1)} Sabins métricos) con paneles fonoabsorbentes (NRC 0.85+)`;
   }
 
+  // --- CONSTRUCCIÓN DINÁMICA DE ELECTROACÚSTICA (EVITA PLANTILLAS CIEGAS) ---
+  const electroacoustics = [
+    { label: 'Topología Recomendada', value: `${activeSpeakerCount}x Sistemas Principales Activos (Diseñado para aforo de ${audience} pers.)` }
+  ];
+
+  // CONDICIONAL ESTRICTA: Si hay 0 subwoofers activos, se oculta completamente la sugerencia de subgraves
+  if (activeSubCount > 0) {
+    electroacoustics.push({
+      label: 'Subwoofers Sugeridos',
+      value: `${activeSubCount}x Subwoofers de 18" configurados en fase`
+    });
+  }
+
+  electroacoustics.push(
+    { label: 'Refuerzos (Delays)', value: needsDelays ? `Requerido: 2x Cajas de retardo alineadas a los ${Math.round(venue.length * 0.6)}m` : 'No se requieren líneas de retardo' },
+    { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia abajo para minimizar primeras reflexiones en muros` },
+    { label: 'Respuesta en Frecuencia', value: freqResponse }
+  );
+
   return {
-    electroacoustics: [
-      { label: 'Topología Recomendada', value: `${recommendedTopBoxes}x Sistemas Principales Activos Balanceados (Diseñado para aforo de ${audience} pers.)` },
-      { label: 'Subwoofers Sugeridos', value: `${recommendedSubwoofers}x Subwoofers de 18" acoplados en fase (Evita cancelación asimétrica)` },
-      { label: 'Refuerzos (Delays)', value: needsDelays ? `Requerido: 2x Cajas de retardo alineadas a los ${Math.round(venue.length * 0.6)}m` : 'No se requieren líneas de retardo' },
-      { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia abajo para minimizar primeras reflexiones en muros` },
-      { label: 'Respuesta en Frecuencia', value: freqResponse }
-    ],
+    electroacoustics,
     amplification: [
       { label: 'Potencia Real Sugerida (Física)', value: `${calculatedRequiredRms} W RMS Totales (Calculada por aforo, volumen y headroom de 3dB)` },
       { label: 'Relación Señal/Ruido', value: '≥ 105 dB (SNR para operación limpia sin piso de ruido audible)' },

@@ -18,7 +18,6 @@ export function calculateRT60(venue) {
 
   const volume = venue.length * venue.width * venue.height;
   
-  // Cálculo de superficie según la geometría del recinto
   let floorCeilingArea = 0;
   let wallsArea = 0;
 
@@ -27,11 +26,9 @@ export function calculateRT60(venue) {
     floorCeilingArea = 2 * (Math.PI * Math.pow(radius, 2));
     wallsArea = (2 * Math.PI * radius) * venue.height;
   } else if (venue.shape === 'fan') {
-    // Geometría en abanico (aprox 1.2x superficie por paredes divergentes)
     floorCeilingArea = 2 * (venue.length * venue.width * 0.85);
     wallsArea = 2 * (venue.length * venue.height) + 2 * (venue.width * venue.height);
   } else {
-    // Rectangular / Estándar
     floorCeilingArea = 2 * (venue.length * venue.width);
     wallsArea = 2 * (venue.length * venue.height) + 2 * (venue.width * venue.height);
   }
@@ -81,7 +78,6 @@ export function calculateOffAxisLoss(speaker, listenerX, listenerY, listenerZ) {
   }
 }
 
-// Suma logarítmica de SPL con efecto de concentración nodal por curvatura (Palenque / Abanico)
 export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ = 1.2, venueType = 'indoor', subwoofers = [], venueShape = 'rectangle', venueWidth = 15, venueLength = 20) {
   let totalIntensity = 0;
 
@@ -98,15 +94,13 @@ export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ
     const offAxisLoss = calculateOffAxisLoss(speaker, listenerX, listenerY, listenerZ);
     let splFromSpeaker = (speaker.maxSpl || 128) - distanceLoss - offAxisLoss;
 
-    // EFECTO PALENQUE / MANTAS CÓNCAVAS: Enfoque reflexivo hacia el centro geométrico
     if (venueShape === 'circle' && venueType === 'indoor') {
       const centerX = venueWidth / 2;
       const centerY = venueLength / 2;
-      const distToCenter = Math.sqrt(Math.pow(listenerX - centerX, 2) + Math.pow(listenerY - centerY, 2));
-      const focalRadius = venueWidth / 4; // Radio del punto focal primario (F = R/2)
+      const distToCenter = Math.hypot(listenerX - centerX, listenerY - centerY);
+      const focalRadius = venueWidth / 4;
 
       if (distToCenter < focalRadius) {
-        // Incremento de presión sonora de +3 dB a +6 dB por reflexiones convergentes
         const focalBoost = (1 - (distToCenter / focalRadius)) * 5.5;
         splFromSpeaker += focalBoost;
       }
@@ -128,13 +122,12 @@ export function calculateSplAtPosition(speakers, listenerX, listenerY, listenerZ
 
       let splFromSub = (sub.maxSpl || 133) - distanceLoss;
 
-      // Reflexión en graves acumulativa en geometría circular o abanico
       if ((venueShape === 'circle' || venueShape === 'fan') && venueType === 'indoor') {
         const centerX = venueWidth / 2;
         const centerY = venueLength / 2;
-        const distToCenter = Math.sqrt(Math.pow(listenerX - centerX, 2) + Math.pow(listenerY - centerY, 2));
+        const distToCenter = Math.hypot(listenerX - centerX, listenerY - centerY);
         if (distToCenter < venueWidth / 3) {
-          splFromSub += 3.0; // Refuerzo de graves por concentración de frontera circular
+          splFromSub += 3.0;
         }
       }
 
@@ -156,23 +149,26 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
   const activeSubCount = subwoofers ? subwoofers.filter(s => s.active !== false).length : 0;
   const activeSpeakerCount = speakers ? speakers.filter(s => s.active !== false).length : 2;
 
-  let powerDensityPerCubicMeter = 0.8; 
+  let powerDensity = 1.0;
+  let crestMultiplier = 2.0;
   let crestFactorNote = 'Headroom dinámico estándar de 3dB';
 
   if (sourceProfile === 'percussion' || sourceProfile === 'live_band') {
-    powerDensityPerCubicMeter = 1.4;
-    crestFactorNote = 'Headroom de 9dB para transitorios violentos (Evita clipping en bombo)';
+    powerDensity = 1.8;
+    crestMultiplier = 4.0;
+    crestFactorNote = 'Headroom estricto de 9dB-12dB para transitorios violentos de percusión (Evita clipping)';
   } else if (sourceProfile === 'edm' || sourceProfile === 'electronic') {
-    powerDensityPerCubicMeter = 1.6;
+    powerDensity = 2.0;
+    crestMultiplier = 3.0;
     crestFactorNote = 'Headroom de 6dB para compresión de música electrónica';
   } else if (sourceProfile === 'speech') {
-    powerDensityPerCubicMeter = 0.3;
-    crestFactorNote = 'Headroom bajo optimizado para voz hablada';
+    powerDensity = 0.4;
+    crestMultiplier = 1.2;
+    crestFactorNote = 'Headroom bajo optimizado para voz';
   }
 
-  const rawCalculatedRms = (volume * powerDensityPerCubicMeter) + (audience * 3.0);
-  const multiplier = (sourceProfile === 'percussion' || sourceProfile === 'live_band') ? 2.5 : 1.8;
-  const calculatedRequiredRms = Math.max(1200, Math.round(rawCalculatedRms * multiplier));
+  const rawPower = (volume * powerDensity) + (audience * 4.0);
+  const calculatedRequiredRms = Math.max(1500, Math.round(rawPower * crestMultiplier));
 
   const suggestedTilt = Math.min(15, Math.max(3, Math.round(venue.length / 3)));
   const needsDelays = venue.length > 25;
@@ -181,47 +177,50 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
   if (sourceProfile === 'edm' || sourceProfile === 'electronic') {
     freqResponse = '35 Hz - 20,000 Hz (Respuesta extendida en sub-graves)';
   } else if (sourceProfile === 'speech') {
-    freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en inteligibilidad vocal)';
+    freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en voz)';
   } else if (sourceProfile === 'percussion' || sourceProfile === 'live_band') {
-    freqResponse = '40 Hz - 18,000 Hz (Optimizado para pegada de transitorios)';
+    freqResponse = '40 Hz - 18,000 Hz (Optimizado para pegada y transitorios)';
   }
 
   const dcDistance = parseFloat((0.14 * Math.sqrt(volume / Math.max(0.1, rt60))).toFixed(1));
   
   let c50Clarity = '+3 dB (Excelente inteligibilidad)';
   if (rt60 > 2.0) c50Clarity = '-3 dB / Pobre (Campo reverberante dominante)';
-  else if (rt60 > 1.2) c50Clarity = '0 dB / Moderado (Aceptable para música)';
+  else if (rt60 > 1.2) c50Clarity = '0 dB / Moderado (Adecuado para música)';
 
-  // ADVERTENCIA FÍSICA DE GEOMETRÍA CÓNCAVA (EFECTO PALENQUE)
-  let absorptionSuggestion = 'Superficies con coeficiente de absorción adecuado para el espacio';
+  let absorptionSuggestion = 'Superficies con coeficiente de absorción adecuado';
   if (venue.shape === 'circle') {
-    absorptionSuggestion = `⚠️ ALERTA DE GEOMETRÍA CÓNCAVA (Palenque): Focalización acústica severa en el centro geométrico (Punto Focal $F=${(venue.width/4).toFixed(1)}m$). Se exige la colocación de difusores poli-cilíndricos o paneles fonoabsorbentes trampa en el perímetro curvo para romper ondas estacionarias radiales.`;
+    absorptionSuggestion = `⚠️ ALERTA DE GEOMETRÍA CÓNCAVA (Palenque): Focalización acústica severa en el centro geométrico. Exige difusores poli-cilíndricos y trampa perimetral.`;
   } else if (venue.shape === 'fan') {
-    absorptionSuggestion = 'Geometría en abanico: Paredes laterales divergentes reducen ecos flotantes paralelos. Se recomienda tratamiento en el muro posterior para evitar reflexiones directas al escenario.';
+    absorptionSuggestion = 'Geometría en abanico: Paredes divergentes reducen ecos flotantes. Requiere control en muro posterior.';
   } else if (rt60 > 1.5) {
     const targetRt60 = sourceProfile === 'speech' ? 0.8 : 1.2;
     const currentSabins = (0.161 * volume) / rt60;
     const targetSabins = (0.161 * volume) / targetRt60;
     const missingSabins = Math.max(0, targetSabins - currentSabins);
     const percentageNeeded = Math.min(100, ((missingSabins / surfaceArea) * 100)).toFixed(1);
-    
     absorptionSuggestion = `Déficit acústico crítico: Tratar al menos el ${percentageNeeded}% (${missingSabins.toFixed(1)} Sabins métricos) con paneles fonoabsorbentes (NRC 0.85+)`;
   }
 
   const electroacoustics = [
-    { label: 'Topología Recomendada', value: venue.shape === 'circle' ? `${activeSpeakerCount}x Arreglos distribuidos en 360° (Anillo Central)` : `${activeSpeakerCount}x Sistemas Principales Activos Balanceados` }
+    { label: 'Topología Recomendada', value: venue.shape === 'circle' ? `${activeSpeakerCount}x Arreglos distribuidos en 360° (Anillo perimetral/central)` : `${activeSpeakerCount}x Sistemas Principales Activos Balanceados` }
   ];
 
   if (activeSubCount > 0) {
     electroacoustics.push({
-      label: 'Subwoofers Sugeridos',
-      value: venue.shape === 'circle' ? `${activeSubCount}x Subwoofers en Arreglo Cardano/Gradient Central (Evita acoplamiento en arena)` : `${activeSubCount}x Subwoofers de 18" configurados en fase`
+      label: 'Subwoofers Activos',
+      value: `${activeSubCount}x Subwoofers configurados por el operador (Soporte de baja frecuencia activo)`
+    });
+  } else {
+    electroacoustics.push({
+      label: 'Subwoofers Activos',
+      value: '⚠️ Ninguno configurado en el panel (Operando en modo Full-Range sin refuerzo de sub-graves)'
     });
   }
 
   electroacoustics.push(
     { label: 'Refuerzos (Delays)', value: needsDelays ? `Requerido: 2x Cajas de retardo alineadas a los ${Math.round(venue.length * 0.6)}m` : 'No se requieren líneas de retardo' },
-    { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia abajo para minimizar primeras reflexiones en muros` },
+    { label: 'Down-tilt Recomendado', value: `${suggestedTilt}° de inclinación hacia abajo para minimizar primeras reflexiones` },
     { label: 'Respuesta en Frecuencia', value: freqResponse }
   );
 
@@ -229,9 +228,9 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     electroacoustics,
     amplification: [
       { label: 'Potencia Real Sugerida (Física)', value: `${calculatedRequiredRms} W RMS Totales (${crestFactorNote})` },
-      { label: 'Relación Señal/Ruido', value: '≥ 105 dB (SNR para operación limpia sin piso de ruido)' },
+      { label: 'Relación Señal/Ruido', value: '≥ 105 dB (SNR para operación limpia)' },
       { label: 'Distorsión Armónica (THD)', value: '< 0.05% THD a potencia nominal (Clase D de alta eficiencia)' },
-      { label: 'Procesamiento Digital (DSP)', value: 'Limitadores Brickwall, Filtros FIR, Alineación temporal y ecualización de muesca para modulos focales' }
+      { label: 'Procesamiento Digital (DSP)', value: 'Limitadores Brickwall configurados para transitorios violentos y filtros FIR' }
     ],
     acoustics: [
       { label: 'Distancia Crítica (Dc)', value: `${dcDistance}m desde la fuente principal` },

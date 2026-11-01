@@ -112,16 +112,32 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
   const surfaceArea = 2 * (venue.width * venue.length + venue.width * (venue.height || 5) + venue.length * (venue.height || 5));
   const audience = venue.audienceCount || 100;
 
-  // Contar subwoofers y bocinas activas reales definidas por el usuario en la interfaz
   const activeSubCount = subwoofers ? subwoofers.filter(s => s.active !== false).length : 0;
   const activeSpeakerCount = speakers ? speakers.filter(s => s.active !== false).length : 2;
 
-  let basePowerPerPerson = 3.5; 
-  if (sourceProfile === 'edm' || sourceProfile === 'electronic') basePowerPerPerson = 5.0;
-  if (sourceProfile === 'speech') basePowerPerPerson = 1.5;
+  // --- MODELO FÍSICO DE POTENCIA CON FACTOR DE CRESTA Y TRANSITORIOS ---
+  // Las percusiones y baterías exigen picos transitorios violentos con un Headroom de 6dB a 10dB (multiplicador de 4x a 8x)
+  let powerDensityPerCubicMeter = 0.8; 
+  let crestFactorNote = 'Headroom dinámico estándar de 3dB';
 
-  const calculatedRequiredRms = Math.round(audience * basePowerPerPerson * (rt60 > 1.5 ? 1.25 : 1.0));
+  if (sourceProfile === 'percussion' || sourceProfile === 'live_band') {
+    powerDensityPerCubicMeter = 1.4; // Mayor densidad de potencia para masa de aire en percusión acústica
+    crestFactorNote = 'Headroom estricto de 9dB para transitorios violentos de batería (Evita clipping en bombo)';
+  } else if (sourceProfile === 'edm' || sourceProfile === 'electronic') {
+    powerDensityPerCubicMeter = 1.6;
+    crestFactorNote = 'Headroom de 6dB para compresión de música electrónica';
+  } else if (sourceProfile === 'speech') {
+    powerDensityPerCubicMeter = 0.3;
+    crestFactorNote = 'Headroom bajo optimizado para voz hablada';
+  }
+
+  // Demanda calculada combinando Volumen de la sala (desplazamiento de aire) + Aforo + Factor de Cresta
+  const rawCalculatedRms = (volume * powerDensityPerCubicMeter) + (audience * 3.0);
+  const multiplier = (sourceProfile === 'percussion' || sourceProfile === 'live_band') ? 2.5 : 1.8;
   
+  // Piso mínimo profesional de potencia (evita los absurdos 88W en recintos grandes)
+  const calculatedRequiredRms = Math.max(1200, Math.round(rawCalculatedRms * multiplier));
+
   const suggestedTilt = Math.min(15, Math.max(3, Math.round(venue.length / 3)));
   const needsDelays = venue.length > 25;
 
@@ -130,6 +146,8 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     freqResponse = '35 Hz - 20,000 Hz (Respuesta extendida en sub-graves)';
   } else if (sourceProfile === 'speech') {
     freqResponse = '80 Hz - 16,000 Hz (Corte de graves enfocado en inteligibilidad vocal)';
+  } else if (sourceProfile === 'percussion' || sourceProfile === 'live_band') {
+    freqResponse = '40 Hz - 18,000 Hz (Optimizado para pegada de transitorios y rango dinámico)';
   }
 
   const dcDistance = parseFloat((0.14 * Math.sqrt(volume / Math.max(0.1, rt60))).toFixed(1));
@@ -149,16 +167,14 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
     absorptionSuggestion = `Déficit acústico crítico: Tratar al menos el ${percentageNeeded}% (${missingSabins.toFixed(1)} Sabins métricos) con paneles fonoabsorbentes (NRC 0.85+)`;
   }
 
-  // --- CONSTRUCCIÓN DINÁMICA DE ELECTROACÚSTICA (EVITA PLANTILLAS CIEGAS) ---
   const electroacoustics = [
     { label: 'Topología Recomendada', value: `${activeSpeakerCount}x Sistemas Principales Activos (Diseñado para aforo de ${audience} pers.)` }
   ];
 
-  // CONDICIONAL ESTRICTA: Si hay 0 subwoofers activos, se oculta completamente la sugerencia de subgraves
   if (activeSubCount > 0) {
     electroacoustics.push({
       label: 'Subwoofers Sugeridos',
-      value: `${activeSubCount}x Subwoofers de 18" configurados en fase`
+      value: `${activeSubCount}x Subwoofers de 18" configurados en fase para soporte de baja frecuencia`
     });
   }
 
@@ -171,10 +187,10 @@ export function getRecommendedSpecs(venue, sourceProfile, rt60, speakers, subwoo
   return {
     electroacoustics,
     amplification: [
-      { label: 'Potencia Real Sugerida (Física)', value: `${calculatedRequiredRms} W RMS Totales (Calculada por aforo, volumen y headroom de 3dB)` },
+      { label: 'Potencia Real Sugerida (Física)', value: `${calculatedRequiredRms} W RMS Totales (${crestFactorNote})` },
       { label: 'Relación Señal/Ruido', value: '≥ 105 dB (SNR para operación limpia sin piso de ruido audible)' },
       { label: 'Distorsión Armónica (THD)', value: '< 0.05% THD a potencia nominal (Clase D de alta eficiencia)' },
-      { label: 'Procesamiento Digital (DSP)', value: 'Filtrado FIR de fase lineal, alineación temporal (Delay ms) y EQ paramétrica' }
+      { label: 'Procesamiento Digital (DSP)', value: 'Limitadores Brickwall configurados para transitorios, filtros FIR y alineación temporal' }
     ],
     acoustics: [
       { label: 'Distancia Crítica (Dc)', value: `${dcDistance}m desde el proscenio (Límite donde el campo directo iguala al reverberante)` },

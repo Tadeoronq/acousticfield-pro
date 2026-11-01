@@ -169,7 +169,6 @@ class CanvasRenderEngine {
 
     this.ctx.save();
 
-    // Obtener el RT60 actual y calcular el multiplicador de reflexiones
     const rt60 = AppState.venue.rt60 || 1.0;
     const reflectionMultiplier = Math.min(1.25, Math.max(0.9, rt60 / 1.5));
 
@@ -181,10 +180,12 @@ class CanvasRenderEngine {
           y + stepM / 2,
           1.2,
           AppState.venue.type,
-          AppState.subwoofers
+          AppState.subwoofers,
+          AppState.venue.shape,   // Geometría activa ('rectangle', 'circle', 'fan')
+          AppState.venue.width,   // Ancho
+          AppState.venue.length   // Largo
         );
 
-        // Multiplicar el SPL por el factor de reverberación del material
         spl *= reflectionMultiplier;
 
         const color = this.splToColor(spl);

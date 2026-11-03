@@ -1,15 +1,16 @@
 /**
  * Módulo de Exportación a PDF
- * Captura en el documento tanto la simulación de Ondas como el Mapa de Calor SPL
+ * Captura en el documento tanto la simulación como el Mapa de Calor SPL
  * con la leyenda espectral visible y métricas técnicas.
  */
 
 import { AppState, notifyStateChange } from '../state.js';
 import { calculateRT60, calculateSplAtPosition, getRecommendedSpecs } from '../physics/acoustics.js';
 import { calculateElectricalLoad } from '../physics/electrical.js';
-import { canvasEngineInstance } from '../render/canvas_engine.js';
+import { getCanvasEngine } from './render/canvas_engine.js';
 
 export function generatePdfReport() {
+  const canvasEngineInstance = getCanvasEngine();
   let heatmapImgData = '';
   let wavesImgData = '';
 
@@ -29,12 +30,20 @@ export function generatePdfReport() {
     AppState.listener.y,
     1.2,
     AppState.venue.type,
-    AppState.subwoofers
+    AppState.subwoofers,
+    AppState.venue.shape,
+    AppState.venue.width,
+    AppState.venue.length
   );
+  
   const elecResult = calculateElectricalLoad(
     AppState.speakers,
     AppState.subwoofers,
-    AppState.venue.voltage
+    AppState.venue.voltage,
+    0.85,
+    AppState.venue,
+    AppState.sourceProfile,
+    rtResult.rt60
   );
 
   const specs = getRecommendedSpecs(
@@ -244,21 +253,21 @@ export function generatePdfReport() {
           <div class="spec-card">
             <h4>A. Cajas, Arreglo y Electroacústica</h4>
             <ul>
-              ${specs.electroacoustics.map(s => `<li><strong>${s.label}:</strong>${s.value}</li>`).join('')}
+              ${specs.electroacoustics.map(s => `<li><strong>${s.label}:</strong> ${s.value}</li>`).join('')}
             </ul>
           </div>
 
           <div class="spec-card">
             <h4>B. Amplificación y Cadena Digital</h4>
             <ul>
-              ${specs.amplification.map(s => `<li><strong>${s.label}:</strong>${s.value}</li>`).join('')}
+              ${specs.amplification.map(s => `<li><strong>${s.label}:</strong> ${s.value}</li>`).join('')}
             </ul>
           </div>
 
           <div class="spec-card" style="grid-column: span 2;">
             <h4>C. Comportamiento Acústico e Inteligibilidad</h4>
             <ul>
-              ${specs.acoustics.map(s => `<li><strong>${s.label}:</strong>${s.value}</li>`).join('')}
+              ${specs.acoustics.map(s => `<li><strong>${s.label}:</strong> ${s.value}</li>`).join('')}
             </ul>
           </div>
         </div>

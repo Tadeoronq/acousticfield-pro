@@ -7,7 +7,8 @@
 import { AppState, notifyStateChange } from '../state.js';
 import { calculateRT60, calculateSplAtPosition, getRecommendedSpecs } from '../physics/acoustics.js';
 import { calculateElectricalLoad } from '../physics/electrical.js';
-import { getCanvasEngine } from './render/canvas_engine.js';
+// CORRECCIÓN DE RUTA: Subir un nivel desde 'js/ui/' hacia 'js/render/'
+import { getCanvasEngine } from '../render/canvas_engine.js';
 
 export function generatePdfReport() {
   const canvasEngineInstance = getCanvasEngine();
